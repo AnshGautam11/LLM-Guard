@@ -5,7 +5,7 @@ from presidio_anonymizer import AnonymizerEngine
 
 app = FastAPI()
 
-TARGET_URL = "https://httpbin.org/post"
+TARGET_URL = "https://postman-echo.com/post"
 
 analyzer = AnalyzerEngine()
 anonymizer = AnonymizerEngine()
