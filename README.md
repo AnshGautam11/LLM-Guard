@@ -71,3 +71,16 @@ curl -X POST http://127.0.0.1:8000/chat \
 > **Note:** `TARGET_URL` currently points to `https://postman-echo.com/post`, a test echo endpoint, for development purposes. Replace with your actual LLM API endpoint for production use.
 
 ## Project Structure
+llm-guard/
+├── main.py           # FastAPI proxy + PII detection/masking
+├── requirements.txt
+└── .gitignore
+
+## Tech Stack
+
+- FastAPI — web framework
+- httpx — async HTTP client for forwarding requests
+- Microsoft Presidio — PII detection & anonymization
+- spaCy — NLP backend for Presidio
+
+## Contributors
