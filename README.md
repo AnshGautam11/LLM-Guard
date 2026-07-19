@@ -43,11 +43,10 @@ The proxy will be available at `http://127.0.0.1:8000`.
 Send a POST request to `/chat`:
 
 $body = @{
->>     message = "My email is john@example.com, card is 4111-1111-1111-1111, and my key is sk-abcdefghijklmnopqrstuvwxyz123456"
->> } | ConvertTo-Json
->> 
->> $response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/chat" -Method Post -Body $body -ContentType "application/json"
->> $response | ConvertTo-Json -Depth 5
+    message = "My email is john@example.com, card is 4111-1111-1111-1111, and my key is sk-abcdefghijklmnopqrstuvwxyz123456"
+} | ConvertTo-Json
+$response = Invoke-RestMethod -Uri "http://127.0.0.1:8000/chat" -Method Post -Body $body -ContentType "application/json"
+$response | ConvertTo-Json -Depth 5
 
 **Response** includes the original message, the masked version actually sent upstream, which entity types were detected, and the upstream response:
 
