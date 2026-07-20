@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 import httpx
 from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
 from presidio_anonymizer import AnonymizerEngine
+from firewall import apply_firewall
 
 app = FastAPI()
 TARGET_URL = "https://postman-echo.com/post"
@@ -31,6 +32,14 @@ analyzer.registry.add_recognizer(api_key_recognizer)
 async def proxy_chat(request: Request):
     body = await request.json()
     user_message = body.get("message", "")
+
+    # Firewall check — must run first, before any DLP/forwarding
+    is_safe, reason = apply_firewall(user_message)
+    if not is_safe:
+        return {
+            "error": "Request blocked by firewall",
+            "reason": reason
+        }
 
     # Step 1: Find sensitive info in the message
     results = analyzer.analyze(

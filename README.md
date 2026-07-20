@@ -42,7 +42,7 @@ python -m spacy download en_core_web_lg
 ## Running
 
 ```bash
-uvicorn main:app --reload
+python -m uvicorn main:app --reload
 ```
 
 The proxy will be available at `http://127.0.0.1:8000`.
