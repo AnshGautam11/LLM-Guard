@@ -1,0 +1,136 @@
+
+
+1) Explain about HTTP and HTTPS difference
+Ans :- HTTP and HTTPS are both protocols for transferring data on the web, but HTTPS adds encryption and authentication,
+       making it much more secure than HTTP.
+	   
+	 # What HTTPS Means
+     1] HTTPS stands for HyperText Transfer Protocol Secure , and it is essentially HTTP plus a security layer called TLS/SSL.
+     2]HTTPS encrypts the data between browser and server, so even if someone intercepts it, they cannot easily read or alter it.
+	 3]HTTPS usually uses port 443,and URLs start with https://; modern browser show a padlock icon for HTTPS sites.
+	 
+	  # What is HTTP 
+	 1] HTTP stands for HyperText Transfer Protocol and defines how browsers and servers communicate to load web page, image , vedio 
+	    and other resources.
+	 2] Data in HTTP is sent as plain text , which means anyone who intercepts the traffic can read or modify it.
+	 3] HTTP typically uses port 80 on the server, and URLs start with http://
+	
+  ## Mein Differences
+    1] Security : HTTP has no encryption or built-in authentication, while 
+                  HTTPS uses TLS/SSL to provide encryption, server identity verification,and protection against man-in-the middle attacks.
+    2] USE CASE : HTTP is suitable only for non-sensitive content, where as HTTPS is strongly recommended (and often required) for login pages,
+                  payments,APIs, and almost all modern websites.
+
+2) what is footprinting and what information does it help gather?
+Ans :- #Footprinting (also called reconnaissance or information gathering) is the first pre-attact phase used by both ethical hackers and malicious attackers.
+	   #The goal is to build a detailed profile of the terget-its technologies,people , and structure-without yet performing an actual exploit.
+	   
+	 ## Types of Footprinting
+	 1]Passive Footprinting
+	 2]Active Footprinting
+	 
+ # What information Its helps Gather
+ 
+ 1] Technical infrastructure: IP address ranges , domain names , subdomains, network blocks , operating systems, open ports , running services, firewalls,VPNs 
+                              IDS/IPS , and network topology.
+ 2] Organizational and human data :- Company details , relationships with other companies , project info,employee names and roles, email addresses,
+                                     phone numbers, staff IDs, and even details from job postings or social profiles.
+ 3] Configuration and security deatils :- authentication mechanisms, access controls,system banners, routing tables ,SNMP information,and security policies that
+                                         might reveal weaknesses. 
+									 
+	# why Footprinting is matter.
+      For attackers, footprinting shows   where the “weak points” are, making later attacks more efficient and targeted.	
+	  
+ 3)what are the stages of the vulnerability lifecycle?
+ Ans:- The vulnerability lifecycle is usually described as five main stages :- 1.Discovery, 2.Coordination and Disclosure, 3.Mitigation, 4.Deployment/Management,
+       Lessons ,Learned/continuous improvement.
+	   
+	   1]Discovery:- A vulnerability is first discovered in software, configuration,or the environment by researcher, vendor, attacker,or automated scanning tool.
+	   2]Coordination & Disclosure:- The finder typically coordinates so they can understand and reproduce the issue.
+	                                 This may invovle resonsible disclosure or public disclosure vai advisories,bug trackers,or vulnerability databsed such as CVE.
+	   3]Mitigation :- The vendor or system owner designs and implemnts a mitigation strategy, often in the form of patches, configuration changes or comensting controls. 							 
+	   4]Deployment and Ongoing Management:- Organiztions must then deploy the patch or other mitigations across all affected assets, verify success, and track status .
+	   5]Lessons Learned and Continuous Improvement:- Finally, organiztions analysze what happened, how quickly they responded, and what can be improved in processes, tooling and traning.
+	   
+4) what is asset discovery and why is it the first step in vulnerability assessment?
+Ans :- Asset discovery is the process of identifying and cataloging every device, application, cloud resou	   rce,and other system in  your environment. Its comes first in vulnerability 
+       assessment because you can find and prioritize weaknesses on assets you actually know exit.
+	   
+	   #Why it matters 
+	   1] It creates the inventory that vulnerability scanning depends on. without that inventory, some system never getr scanned at all.
+	   2] It help reduce blind spots such as shadow IT , forgotten servers, and unmanaged cloud instances.
+	   3] It improves prioritization by linking vulnerabilities to asset criticality, exposure,and business risk.
+	   4] It also help avoid double-countind or misidentifying devices,which makes reporting more accurate.
+	   
+5)what is Metasploit Framework and what are its main components?
+	   Ans:- Metasploit Framework is an open-source, modular platform used for developing, testing, and executting exploits against systems as part of penetration testing and security research.
+	         It bundles scanners, exploits, payloads, and post-exploitations tools in one framework so you can go from discovery to compromise and post-exploitation within a single environment.
+			 
+		# Main components 
+		 1] Core libraries (Rex/core/Base)
+		   -> Provide low-level functionality: sockets, protocols, sessions, encoding, logging,and module loading.
+		   -> Expose an API so module and external tools can interact with Metaspoit programmatically.
+		   
+		 2] Framework API/RPC services
+          -> Allow automation and intergration 
+          -> Back the web UI and some commercail front-ends
+        
+        3]  Database Backend 
+         -> Stores hosts, services, vulnerabilities, credentials, loot and session data.
+         -> Lets you run commands like hosts, services,vulns, and keep results acroos a whole engegement.
+
+        4] Datastore
+         -> Key-value store used to configure modules (RHOSTS,LHOTS,LPORTS)
+		 -> Supports global options(setg) and per-module options(set) so you can reuse settings across modules.
+		 
+		 
+6) what is the difference between a vulnerability and an exploit ?
+Ans:-
+     #Vulnerability:- 
+                   -> Vulnerability is a flew , misconfiguration, or weakness in software, hardware, or procedures that could be abused.
+                     Example:- unpatched software , default passwords, missing access checks in code.
+                   -> By itself, a vulnerability is just a potential problem; if nobody finds or uses it, it still exists but hasn't led to an incident yet.
+				   
+    # Exploit:- 
+              -> An exploit is the specific technique, script or tool used to leverage a vulnerrability to achieve some impact.
+              -> Exploits can be custom proof-of-concepts written by researchers or ready-made modules in tools like Metaspoit that weaponize known vulnerabilities	.
+
+7) what is CVE and what information does it provide?
+Ans:- CVE (Common vulneribility Exposures) is a global naming and cataloging system for publicly known security vulnerabilities and exposures in software and hardware.
+     Each CVE entry gives a standardized "record" so vendors,tools,and defenders can all talk about the same issue
+
+   # What information a CVE entry provides
+   1] CVE ID: A unique identifier in the from CVE-YYYY-NNNNN (year plus sequence number),used in patch notes,scanner outputs, and advisories.
+   2] Brief description :- A short text describing the vulnerable product, affected versions, and the nature of the vulnerability
+   3] Referenaces:- Links to vendor advisories, security researcher write-ups, patches, or other sources with more technical detail and remediation infornatuons.   
+  
+8)what is an Insecure Direct Object Reference (IDOR)?
+Ans:-  An Insecure Direct Objectb Reference(IDOR) is an access control vulnerability where an application lets a user directly refernce an internal object 
+      (like a record ID, filename,or user ID) and fails to properly check whether that user is authorized to access that specific object. In practice,it
+	  means you can often change an ID in URL OR request parameter and gain access to someone else data or actions.
+	  
+9)what is the goal of the maintaining access phase in ethical hacking ?
+Ans :-# The goal of the maintaining access phase in ethical hacking is to keep a reliable, steathly foothold in the compromised system long enough to complete 
+        the test objective without being detection, and to measure how long an attacker could realistically remain inside.
+	  # Inclassic 5 phases(Reconnaissance,Scanning,Gaining,Access, Maintaining Access, Covering Tracks),maintining access comes after the initail compromise.
+         At this point, the ethical hacker already has access and now focuses on staying in,  not just getting in.
+
+10)what is an auxiliary module in Metasploit?
+Ans:- An auxiliary module in Metasploit is any module that is not designed to deliver a payload or "pop a shell:,but instead performs
+      supporting tasks like scanning, enumeration, fuzzing,brute forcing, or other non-exploit actions. In short, its a "utility" module used for information 
+	  gathering and assessment rather than direct exploitation.
+	 
+11)what is meterpreter in Metasploit and why is it widely used?
+Ans:- Meterpreter is an advanced , extensible payload in Metasploitthat gives you a powerful interactive shell on the target and rich post-exploitation capabilities,
+      and it is widely used because it runs entirely in memory, is modular, and communicate over an encrypts channel,making it flexible and relatively steatly.
+	  
+	# why it is widelyused 
+     1]	Stealth and low forensic footprint:- since it lives in memory, does not spawn new processes, and communicate over an encrypted channel.
+	 2] Powerful post-exploitation:- From a single Meterpreter session you can do file uploads/downloads, process migration, keylogging, screenshots, port forwarding, 
+	    credentail dumping and more , tuurning it into a "Swiss army knife" for post-expoitation.
+     3]DFlexibility and ecosystem support:- It has multiple implementations (C,PHP,Python ,Java) and can be delivered by many different exploits and stagers, so it
+       fits a wide range of target and scenarios, which is ahy both penetration tester and attacker commonly use it.	 
+	 
+	  
+ 
+	  
