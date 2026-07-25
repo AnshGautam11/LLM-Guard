@@ -59,6 +59,13 @@ async def proxy_chat(request: ChatRequest):
     # ML Jailbreak Detection
     ml_prediction = detect_jailbreak(user_message)
 
+    if ml_prediction == "JAILBREAK":
+        return {
+            "status": "Blocked",
+            "error": "Request blocked by ML jailbreak detector",
+            "reason": "ML model classified this prompt as a jailbreak attempt",
+        }
+
     # Detect Sensitive Information
     results = analyzer.analyze(
         text=user_message,
