@@ -6,7 +6,7 @@ from presidio_anonymizer import AnonymizerEngine
 from firewall import apply_firewall
 from ml_detector import detect_jailbreak
 from config import get_active_llm_config
-
+from telemetry import log_event
 class ChatRequest(BaseModel):
     message: str
 
@@ -41,7 +41,6 @@ analyzer.registry.add_recognizer(api_key_recognizer)
 async def root():
     return {"message": "LLM Guard API is running"}
 
-
 @app.post("/chat")
 async def proxy_chat(request: ChatRequest):
     user_message = request.message
@@ -50,6 +49,7 @@ async def proxy_chat(request: ChatRequest):
     is_safe, reason = apply_firewall(user_message)
 
     if not is_safe:
+        log_event(status="Blocked", reason=reason, original_message=user_message)
         return {
             "status": "Blocked",
             "error": "Request blocked by firewall",
@@ -60,6 +60,12 @@ async def proxy_chat(request: ChatRequest):
     ml_prediction = detect_jailbreak(user_message)
 
     if ml_prediction == "JAILBREAK":
+        log_event(
+            status="Blocked",
+            reason="ML jailbreak detection",
+            ml_prediction=ml_prediction,
+            original_message=user_message,
+        )
         return {
             "status": "Blocked",
             "error": "Request blocked by ML jailbreak detector",
@@ -100,13 +106,22 @@ async def proxy_chat(request: ChatRequest):
     if ml_prediction == "JAILBREAK":
         risk_level = "HIGH"
 
+    def build_upstream_request(llm_config, safe_message: str):
+        if llm_config.provider == "openai":
+            return {
+                "model": llm_config.model,
+                "messages": [{"role": "user", "content": safe_message}],
+            }
+        return {"message": safe_message}
+
     # Forward Safe Prompt
     try:
+        payload = build_upstream_request(llm_config, safe_message)
         headers = {"Authorization": f"Bearer {llm_config.api_key}"} if llm_config.api_key else {}
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 TARGET_URL,
-                json={"message": safe_message},
+                json=payload,
                 headers=headers,
             )
 
@@ -136,6 +151,14 @@ async def proxy_chat(request: ChatRequest):
             "original_message": user_message,
             "safe_message_sent": safe_message,
         }
+
+    log_event(
+        status="Processed Successfully",
+        risk_level=risk_level,
+        ml_prediction=ml_prediction,
+        detected_items=[r.entity_type for r in results],
+        original_message=user_message,
+    )
 
     return {
         "status": "Processed Successfully",
