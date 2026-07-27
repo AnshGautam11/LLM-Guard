@@ -3,10 +3,9 @@ from pydantic import BaseModel
 import httpx
 from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
 from presidio_anonymizer import AnonymizerEngine
-
 from firewall import apply_firewall
 from ml_detector import detect_jailbreak
-
+from config import get_active_llm_config
 
 class ChatRequest(BaseModel):
     message: str
@@ -14,7 +13,8 @@ class ChatRequest(BaseModel):
 
 app = FastAPI()
 
-TARGET_URL = "https://postman-echo.com/post"
+llm_config = get_active_llm_config()
+TARGET_URL = llm_config.base_url
 
 # Initialize Presidio
 analyzer = AnalyzerEngine()
@@ -102,10 +102,12 @@ async def proxy_chat(request: ChatRequest):
 
     # Forward Safe Prompt
     try:
+        headers = {"Authorization": f"Bearer {llm_config.api_key}"} if llm_config.api_key else {}
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 TARGET_URL,
                 json={"message": safe_message},
+                headers=headers,
             )
 
             response.raise_for_status()
