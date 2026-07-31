@@ -1,5 +1,7 @@
 import re
 
+from latency_audit import latency_audit
+
 MAX_PROMPT_LENGTH = 2000  # characters — tune later if needed
 
 BLOCKED_PATTERNS = {
@@ -56,6 +58,7 @@ def check_blocked_patterns(message: str) -> tuple[bool, str]:
     return True, ""
 
 
+@latency_audit.measure("Firewall")
 def apply_firewall(message: str) -> tuple[bool, str]:
     """Returns (is_safe, reason_if_blocked)"""
     ok, reason = check_length(message)
