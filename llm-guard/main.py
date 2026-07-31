@@ -7,6 +7,7 @@ from firewall import apply_firewall
 from ml_detector import detect_jailbreak
 from config import get_active_llm_config
 from telemetry import log_event
+from latency_audit import latency_audit
 class ChatRequest(BaseModel):
     message: str
 
@@ -37,11 +38,71 @@ api_key_recognizer = PatternRecognizer(
 analyzer.registry.add_recognizer(api_key_recognizer)
 
 
+@latency_audit.measure("DLP Redaction")
+def run_dlp_redaction(user_message: str):
+    """Presidio analyze + anonymize, measured as one DLP stage."""
+    results = analyzer.analyze(
+        text=user_message,
+        language="en",
+        entities=[
+            "CREDIT_CARD",
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "US_SSN",
+            "PERSON",
+            "LOCATION",
+            "API_KEY",
+        ],
+    )
+
+    anonymized = anonymizer.anonymize(
+        text=user_message,
+        analyzer_results=results,
+    )
+
+    return results, anonymized.text
+
+
+@latency_audit.measure("Upstream LLM Call")
+async def call_upstream_llm(payload: dict, headers: dict):
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.post(TARGET_URL, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
 @app.get("/")
 async def root():
     return {"message": "LLM Guard API is running"}
 
+
+@app.get("/audit/summary")
+async def audit_summary():
+    """Prints the latency breakdown to console/logs and returns it as JSON.
+    Use this after sending a few /chat requests to prove the security
+    layer (Firewall + ML Detector + DLP) adds minimal latency vs. the
+    upstream LLM call.
+    """
+    latency_audit.summary()
+
+    non_llm_total = sum(
+        r["latency_ms"] for r in latency_audit.records
+        if r["component"] != "Upstream LLM Call"
+    )
+    llm_total = sum(
+        r["latency_ms"] for r in latency_audit.records
+        if r["component"] == "Upstream LLM Call"
+    )
+
+    return {
+        "records": latency_audit.records,
+        "security_layer_added_latency_ms": round(non_llm_total, 2),
+        "upstream_llm_latency_ms": round(llm_total, 2),
+    }
+
+
 @app.post("/chat")
+@latency_audit.measure("Proxy")
 async def proxy_chat(request: ChatRequest):
     user_message = request.message
 
@@ -72,28 +133,8 @@ async def proxy_chat(request: ChatRequest):
             "reason": "ML model classified this prompt as a jailbreak attempt",
         }
 
-    # Detect Sensitive Information
-    results = analyzer.analyze(
-        text=user_message,
-        language="en",
-        entities=[
-            "CREDIT_CARD",
-            "EMAIL_ADDRESS",
-            "PHONE_NUMBER",
-            "US_SSN",
-            "PERSON",
-            "LOCATION",
-            "API_KEY",
-        ],
-    )
-
-    # Mask Sensitive Information
-    anonymized = anonymizer.anonymize(
-        text=user_message,
-        analyzer_results=results,
-    )
-
-    safe_message = anonymized.text
+    # Detect + Mask Sensitive Information (DLP stage, latency-measured)
+    results, safe_message = run_dlp_redaction(user_message)
 
     # Risk Level
     risk_level = "LOW"
@@ -118,15 +159,7 @@ async def proxy_chat(request: ChatRequest):
     try:
         payload = build_upstream_request(llm_config, safe_message)
         headers = {"Authorization": f"Bearer {llm_config.api_key}"} if llm_config.api_key else {}
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                TARGET_URL,
-                json=payload,
-                headers=headers,
-            )
-
-            response.raise_for_status()
-            upstream_data = response.json()
+        upstream_data = await call_upstream_llm(payload, headers)
 
     except httpx.TimeoutException:
         return {

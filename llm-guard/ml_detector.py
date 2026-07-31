@@ -1,10 +1,13 @@
 import joblib
 
+from latency_audit import latency_audit
+
 # Load model only once
 model = joblib.load("jailbreak_detector.pkl")
 vectorizer = joblib.load("vectorizer.pkl")
 
 
+@latency_audit.measure("ML Jailbreak Detector")
 def detect_jailbreak(message: str):
     """
     Returns:

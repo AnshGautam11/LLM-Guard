@@ -218,6 +218,15 @@ or
 - ML jailbreak detection
 - Email, Phone Number, Credit Card, and API Key masking using Microsoft Presidio
 - Safe forwarding of sanitized prompts
+
+Latency Audit
+
+As part of the Mid Week Review, a latency auditing mechanism was integrated into the LLM-Guard project to monitor the performance of the request processing pipeline. A dedicated latency_audit.py module was developed to measure the execution time of critical operations, particularly the communication between the proxy server and the upstream LLM API.
+
+The latency measurement was implemented using a reusable decorator, allowing execution times to be captured automatically without affecting the existing application logic. The proxy request function was instrumented to record the total response time for each request, making it easier to analyze system performance and identify potential bottlenecks.
+
+With this implementation, the project now supports basic performance monitoring while preserving all previously implemented security features, including the Prompt Firewall, DLP masking, and ML-based Jailbreak Detection. This enhancement improves the observability of the application and provides a foundation for future performance optimization and monitoring.
+- 
 ## Contributors
 
 
