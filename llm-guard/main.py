@@ -8,6 +8,10 @@ from ml_detector import detect_jailbreak
 from config import get_active_llm_config
 from telemetry import log_event
 from latency_audit import latency_audit
+from output_validator import validate_output
+from mock_llm import generate_mock_response
+
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -16,6 +20,9 @@ app = FastAPI()
 
 llm_config = get_active_llm_config()
 TARGET_URL = llm_config.base_url
+
+
+USE_MOCK_LLM = True
 
 # Initialize Presidio
 analyzer = AnalyzerEngine()
@@ -71,6 +78,15 @@ async def call_upstream_llm(payload: dict, headers: dict):
         return response.json()
 
 
+@latency_audit.measure("Mock LLM Call")
+def call_mock_llm(safe_message: str) -> str:
+    """Testing-only path used while USE_MOCK_LLM is True. Kept as its own
+    latency-measured stage (separate label from 'Upstream LLM Call') so
+    /audit/summary doesn't blend mock and real call timings together.
+    """
+    return generate_mock_response(safe_message)
+
+
 @app.get("/")
 async def root():
     return {"message": "LLM Guard API is running"}
@@ -80,18 +96,18 @@ async def root():
 async def audit_summary():
     """Prints the latency breakdown to console/logs and returns it as JSON.
     Use this after sending a few /chat requests to prove the security
-    layer (Firewall + ML Detector + DLP) adds minimal latency vs. the
-    upstream LLM call.
+    layer (Firewall + ML Detector + DLP + Output Validation) adds minimal
+    latency vs. the upstream LLM call.
     """
     latency_audit.summary()
 
     non_llm_total = sum(
         r["latency_ms"] for r in latency_audit.records
-        if r["component"] != "Upstream LLM Call"
+        if r["component"] not in ("Upstream LLM Call", "Mock LLM Call")
     )
     llm_total = sum(
         r["latency_ms"] for r in latency_audit.records
-        if r["component"] == "Upstream LLM Call"
+        if r["component"] in ("Upstream LLM Call", "Mock LLM Call")
     )
 
     return {
@@ -155,34 +171,56 @@ async def proxy_chat(request: ChatRequest):
             }
         return {"message": safe_message}
 
-    # Forward Safe Prompt
-    try:
-        payload = build_upstream_request(llm_config, safe_message)
-        headers = {"Authorization": f"Bearer {llm_config.api_key}"} if llm_config.api_key else {}
-        upstream_data = await call_upstream_llm(payload, headers)
+    # Get LLM Response (mock during testing, real upstream otherwise)
+    if USE_MOCK_LLM:
+        llm_response_text = call_mock_llm(safe_message)
+        raw_upstream_data = {"mock_response": llm_response_text}
+    else:
+        try:
+            payload = build_upstream_request(llm_config, safe_message)
+            headers = {"Authorization": f"Bearer {llm_config.api_key}"} if llm_config.api_key else {}
+            raw_upstream_data = await call_upstream_llm(payload, headers)
+            llm_response_text = str(raw_upstream_data)
 
-    except httpx.TimeoutException:
-        return {
-            "status": "Failed",
-            "error": "Upstream API timed out",
-            "original_message": user_message,
-            "safe_message_sent": safe_message,
-        }
+        except httpx.TimeoutException:
+            return {
+                "status": "Failed",
+                "error": "Upstream API timed out",
+                "original_message": user_message,
+                "safe_message_sent": safe_message,
+            }
 
-    except httpx.HTTPStatusError as e:
-        return {
-            "status": "Failed",
-            "error": f"Upstream API returned {e.response.status_code}",
-            "original_message": user_message,
-            "safe_message_sent": safe_message,
-        }
+        except httpx.HTTPStatusError as e:
+            return {
+                "status": "Failed",
+                "error": f"Upstream API returned {e.response.status_code}",
+                "original_message": user_message,
+                "safe_message_sent": safe_message,
+            }
 
-    except Exception as e:
+        except Exception as e:
+            return {
+                "status": "Failed",
+                "error": str(e),
+                "original_message": user_message,
+                "safe_message_sent": safe_message,
+            }
+
+    # Output Validation (Week 3, Task 1) — secondary check on the LLM
+    # response before anything is returned to the user.
+    validation = validate_output(llm_response_text)
+
+    if not validation.is_safe:
+        log_event(
+            status="Blocked",
+            reason=f"Output Validation: {validation.blocked_reason}",
+            ml_prediction=ml_prediction,
+            original_message=user_message,
+        )
         return {
-            "status": "Failed",
-            "error": str(e),
-            "original_message": user_message,
-            "safe_message_sent": safe_message,
+            "status": "Blocked",
+            "error": "Response blocked by output validation",
+            "reason": validation.blocked_reason,
         }
 
     log_event(
@@ -201,5 +239,6 @@ async def proxy_chat(request: ChatRequest):
         "safe_message_sent": safe_message,
         "detected_items": [r.entity_type for r in results],
         "ml_prediction": ml_prediction,
-        "upstream_response": upstream_data,
+        "upstream_response": validation.sanitized_response,
+        "output_warnings": validation.warnings,
     }
