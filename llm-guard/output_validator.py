@@ -6,15 +6,7 @@ reach the user. Complements the input-side Firewall + ML Jailbreak Detector
 by catching things that only appear in *output*: toxic/unsafe generations,
 hallucination signals, leaked secrets/PII, leaked system instructions, and
 degenerate/oversized text.
-
-Design:
-    - Each concern is a small, independent "check" function with a single
-      responsibility (toxicity, hallucination, leakage, structure).
-    - `validate_output()` orchestrates them in a fixed pipeline and returns
-      one OutputValidationResult, so callers (main.py) never touch
-      individual checks directly.
-    - Hard-block checks (toxicity, system-prompt leakage) short-circuit and
-      return is_safe=False immediately — nothing after a hard block is
+=False immediately — nothing after a hard block is
       trusted or returned to the user.
     - Soft checks (hallucination, repetition) accumulate warnings but do
       not block, since blocking on every hedge word would make the
