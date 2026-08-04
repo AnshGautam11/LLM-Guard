@@ -20,15 +20,17 @@ def log_event(
     risk_level: str = None,
     ml_prediction: str = None,
     detected_items: list = None,
+    output_detected_items: list = None,
     original_message: str = None,
 ):
     event = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": status,
-        "reason": reason,
-        "risk_level": risk_level,
-        "ml_prediction": ml_prediction,
-        "detected_items": detected_items or [],
-        "original_message": original_message,
-    }
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+    "status": status,
+    "reason": reason,
+    "risk_level": risk_level,
+    "ml_prediction": ml_prediction,
+    "detected_items": detected_items or [],
+    "output_detected_items": output_detected_items or [],
+    "original_message": original_message,
+}
     logger.info(json.dumps(event))
