@@ -69,6 +69,34 @@ def run_dlp_redaction(user_message: str):
 
     return results, anonymized.text
 
+@latency_audit.measure("Output DLP Check")
+def run_output_dlp(response_text: str):
+    """
+    Scan the LLM response for sensitive information before
+    sending it back to the user.
+    """
+
+    results = analyzer.analyze(
+        text=response_text,
+        language="en",
+        entities=[
+            "CREDIT_CARD",
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "US_SSN",
+            "PERSON",
+            "LOCATION",
+            "API_KEY",
+        ],
+    )
+
+    anonymized = anonymizer.anonymize(
+        text=response_text,
+        analyzer_results=results,
+    )
+
+    return results, anonymized.text
+
 
 @latency_audit.measure("Upstream LLM Call")
 async def call_upstream_llm(payload: dict, headers: dict):
@@ -208,8 +236,16 @@ async def proxy_chat(request: ChatRequest):
 
     # Output Validation (Week 3, Task 1) — secondary check on the LLM
     # response before anything is returned to the user.
-    validation = validate_output(llm_response_text)
+    # -----------------------------
+# Output DLP (NEW)
+# -----------------------------
+    output_results, safe_output = run_output_dlp(llm_response_text)
 
+# -----------------------------
+# Existing Output Validation
+# -----------------------------
+    validation = validate_output(safe_output)
+ 
     if not validation.is_safe:
         log_event(
             status="Blocked",
@@ -224,11 +260,13 @@ async def proxy_chat(request: ChatRequest):
         }
 
     log_event(
-        status="Processed Successfully",
-        risk_level=risk_level,
-        ml_prediction=ml_prediction,
-        detected_items=[r.entity_type for r in results],
-        original_message=user_message,
+    status="Processed Successfully",
+    risk_level=risk_level,
+    detected_items=[r.entity_type for r in results],
+    output_detected_items=[
+        r.entity_type for r in output_results
+    ],
+    ml_prediction=ml_prediction,
     )
 
     return {
@@ -239,6 +277,11 @@ async def proxy_chat(request: ChatRequest):
         "safe_message_sent": safe_message,
         "detected_items": [r.entity_type for r in results],
         "ml_prediction": ml_prediction,
-        "upstream_response": validation.sanitized_response,
+        "upstream_response": safe_output,
         "output_warnings": validation.warnings,
+        "output_sensitive_items": len(output_results),
+
+        "output_detected_items": [
+         r.entity_type for r in output_results
+        ],
     }
