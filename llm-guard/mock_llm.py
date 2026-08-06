@@ -9,7 +9,6 @@ It is used only for development and testing of the Output Validation module.
 def generate_mock_response(prompt: str) -> str:
     """
     Simulates an LLM response based on the user's prompt.
-
     Args:
         prompt (str): User input after Firewall, ML Detection and DLP.
 
