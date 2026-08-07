@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
+from owasp_mapper import get_owasp_mapping
 
 from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
 from presidio_anonymizer import AnonymizerEngine
@@ -265,12 +266,6 @@ async def proxy_chat(
     # 1. RATE LIMITING
     # =====================================================
 
-    user_message = request.message
-
-    # =====================================================
-    # 1. RATE LIMITING
-    # =====================================================
-
     client_ip = (
         http_request.client.host
         if http_request.client
@@ -293,6 +288,7 @@ async def proxy_chat(
                 "error": "Rate limit exceeded",
                 "reason": "Too many requests from this client",
                 "retry_after_seconds": retry_after,
+                "owasp": get_owasp_mapping("rate_limit"),
             },
             headers={
                 "Retry-After": str(retry_after)
@@ -315,10 +311,11 @@ async def proxy_chat(
         )
 
         return {
-            "status": "Blocked",
-            "error": "Request blocked by firewall",
-            "reason": reason,
-        }
+    "status": "Blocked",
+    "error": "Request blocked by firewall",
+    "reason": reason,
+    "owasp": get_owasp_mapping("firewall"),
+}
 
 
     # =====================================================
@@ -523,7 +520,7 @@ async def proxy_chat(
         }
 
 
-    # =====================================================
+     # =====================================================
     # 10. TELEMETRY
     # =====================================================
 
@@ -537,6 +534,14 @@ async def proxy_chat(
         for result in output_results
     ]
 
+    # Map detected sensitive data to OWASP API Security Top 10
+    owasp_findings = []
+
+    if input_detected_items or output_detected_items:
+        owasp_findings.append(
+            get_owasp_mapping("sensitive_data")
+        )
+
     log_event(
         status="Processed Successfully",
         risk_level=risk_level,
@@ -544,7 +549,6 @@ async def proxy_chat(
         output_detected_items=output_detected_items,
         ml_prediction=ml_prediction,
     )
-
 
     # =====================================================
     # 11. FINAL SAFE RESPONSE
@@ -558,12 +562,9 @@ async def proxy_chat(
         "safe_message_sent": safe_message,
         "detected_items": input_detected_items,
         "ml_prediction": ml_prediction,
+        "owasp_findings": owasp_findings,
         "upstream_response": safe_output,
         "output_warnings": validation.warnings,
-        "output_sensitive_items": len(
-            output_results
-        ),
-        "output_detected_items": (
-            output_detected_items
-        ),
+        "output_sensitive_items": len(output_results),
+        "output_detected_items": output_detected_items,
     }
