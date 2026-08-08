@@ -9,8 +9,8 @@ from presidio_anonymizer import AnonymizerEngine
 
 from firewall import apply_firewall
 from ml_detector import detect_jailbreak
-from config import get_active_llm_config
 from telemetry import log_event
+from config import get_active_llm_config
 from rate_limiter import rate_limiter
 from latency_audit import latency_audit
 from output_validator import validate_output
