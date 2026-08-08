@@ -16,17 +16,11 @@ from latency_audit import latency_audit
 from output_validator import validate_output
 from mock_llm import generate_mock_response
 
-
-# =========================================================
-# REQUEST MODEL
-# =========================================================
-
-class ChatRequest(BaseModel):
-    message: str
+from fastapi.middleware.cors import CORSMiddleware
 
 
 # =========================================================
-# FASTAPI APPLICATION
+# FASTAPI APPLICATION (PEHLE APP DEFINE KAREIN)
 # =========================================================
 
 app = FastAPI(
@@ -34,6 +28,27 @@ app = FastAPI(
     description="Security proxy for protecting LLM applications",
     version="1.0.0",
 )
+
+
+# =========================================================
+# MIDDLEWARE (APP BANE KE BAAD ADD KAREIN)
+# =========================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Sabhi origins allow karne ke liye
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# =========================================================
+# REQUEST MODEL
+# =========================================================
+
+class ChatRequest(BaseModel):
+    message: str
 
 
 # =========================================================
