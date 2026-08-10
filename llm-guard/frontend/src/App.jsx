@@ -336,10 +336,13 @@ function Dashboard() {
     const started = performance.now();
     let data;
     try {
-      if (liveMode) {
+     if (liveMode) {
         const res = await fetch(`${apiBase.replace(/\/$/, "")}/chat`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": "sk-dev-changeme456",
+          },
           body: JSON.stringify({ message: prompt }),
         });
         data = await res.json();
