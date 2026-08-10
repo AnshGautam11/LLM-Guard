@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
@@ -17,6 +17,7 @@ from output_validator import validate_output
 from mock_llm import generate_mock_response
 
 from fastapi.middleware.cors import CORSMiddleware
+from auth import require_role
 
 
 # =========================================================
@@ -217,7 +218,7 @@ def call_mock_llm(safe_message: str) -> str:
 # =========================================================
 
 @app.get("/")
-async def root():
+async def root(caller: dict = Depends(require_role("admin", "developer", "viewer"))):
 
     return {
         "message": "LLM Guard API is running"
@@ -229,7 +230,7 @@ async def root():
 # =========================================================
 
 @app.get("/audit/summary")
-async def audit_summary():
+async def audit_summary(caller: dict = Depends(require_role("admin"))):
     """
     Return latency information collected from the
     security pipeline.
@@ -273,6 +274,7 @@ async def audit_summary():
 async def proxy_chat(
     request: ChatRequest,
     http_request: Request,
+    caller: dict = Depends(require_role("admin", "developer")),
 ):
 
     user_message = request.message
