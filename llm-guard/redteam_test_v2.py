@@ -31,6 +31,7 @@ import csv
 import requests
 
 URL = "http://127.0.0.1:8000/chat"
+HEADERS = {"x-api-key": "sk-admin-changeme123"}
 
 # ---------------------------------------------------------------------------
 # ATTACK PROMPTS, GROUPED BY CATEGORY
@@ -127,7 +128,7 @@ NORMAL = {
 def send_request(message: str):
     start = time.perf_counter()
     try:
-        resp = requests.post(URL, json={"message": message}, timeout=10)
+        resp = requests.post(URL, json={"message": message}, headers=HEADERS, timeout=10)
         elapsed_ms = (time.perf_counter() - start) * 1000
         data = resp.json()
         # Works regardless of WHICH layer blocked it (firewall or ML)
