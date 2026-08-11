@@ -259,13 +259,12 @@ async def proxy_chat(
     request: ChatRequest,
     http_request: Request,
 ):
-
     user_message = request.message
 
-    # =====================================================
-    # 1. RATE LIMITING
-    # =====================================================
-
+    user_id = http_request.headers.get(
+        "X-User-ID",
+        "unknown"
+    )
     client_ip = (
         http_request.client.host
         if http_request.client
@@ -296,27 +295,27 @@ async def proxy_chat(
         )
 
 
-    # =====================================================
+    # =========================================================
     # 2. FIREWALL CHECK
-    # =====================================================
+    # =========================================================
 
     is_safe, reason = apply_firewall(user_message)
 
     if not is_safe:
-
         log_event(
             status="Blocked",
+            user_id=user_id,
+            firewall_rule=reason,
             reason=reason,
             original_message=user_message,
         )
 
         return {
-    "status": "Blocked",
-    "error": "Request blocked by firewall",
-    "reason": reason,
-    "owasp": get_owasp_mapping("firewall"),
-}
-
+            "status": "Blocked",
+            "error": "Request blocked by firewall",
+            "reason": reason,
+            "owasp": get_owasp_mapping("firewall"),
+        }
 
     # =====================================================
     # 3. ML JAILBREAK DETECTION
@@ -325,9 +324,10 @@ async def proxy_chat(
     ml_prediction = detect_jailbreak(user_message)
 
     if ml_prediction == "JAILBREAK":
-
         log_event(
             status="Blocked",
+            user_id=user_id,
+            firewall_rule="ML_JAILBREAK_DETECTION",
             reason="ML jailbreak detection",
             ml_prediction=ml_prediction,
             original_message=user_message,
@@ -340,6 +340,7 @@ async def proxy_chat(
                 "ML model classified this prompt "
                 "as a jailbreak attempt"
             ),
+            "owasp": get_owasp_mapping("jailbreak"),
         }
 
 
