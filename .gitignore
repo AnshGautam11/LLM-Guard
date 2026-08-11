@@ -6,3 +6,7 @@ __pycache__/
 main
 .env
 telemetry.log
+telemetry.db
+telemetry.log
+__pycache__/
+*.pyc
