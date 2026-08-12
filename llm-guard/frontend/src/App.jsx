@@ -341,7 +341,7 @@ function Dashboard() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": "sk-dev-changeme456",
+            "x-api-key": import.meta.env.VITE_API_KEY,
           },
           body: JSON.stringify({ message: prompt }),
         });
