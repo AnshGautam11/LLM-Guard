@@ -480,7 +480,7 @@ function Dashboard() {
           <StatCard icon={ShieldCheck} label="Prompts allowed" value={persistedStats?.allowed ?? 0} />
           <StatCard icon={ShieldX} label="Prompts blocked" value={persistedStats?.blocked ?? 0} />
           <StatCard icon={ShieldAlert} label="Threats detected" value={persistedStats?.threats_detected ?? 0} />
-          <StatCard icon={Activity} label="Detection rate" value={`${persistedStats?.success_rate ?? 0}%`} />
+          <StatCard icon={Activity} label="Current Threat Detection" value={`${persistedStats?.success_rate ?? 0}%`} />
           <StatCard icon={Radio} label="System status" value="Operational" small />
         </div>
       </section>
