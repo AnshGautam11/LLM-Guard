@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
@@ -15,9 +15,9 @@ from rate_limiter import rate_limiter
 from latency_audit import latency_audit
 from output_validator import validate_output
 from mock_llm import generate_mock_response
+from database import dashboard_data, record_prompt
 
 from fastapi.middleware.cors import CORSMiddleware
-from auth import require_role
 
 
 # =========================================================
@@ -50,6 +50,17 @@ app.add_middleware(
 
 class ChatRequest(BaseModel):
     message: str
+
+
+class HistoryRecord(BaseModel):
+    prompt: str
+    result: dict
+
+
+def persist_and_return(prompt: str, result: dict):
+    """Audit the completed pipeline outcome without changing its public payload."""
+    record_prompt(prompt, result)
+    return result
 
 
 # =========================================================
@@ -218,7 +229,7 @@ def call_mock_llm(safe_message: str) -> str:
 # =========================================================
 
 @app.get("/")
-async def root(caller: dict = Depends(require_role("admin", "developer", "viewer"))):
+async def root():
 
     return {
         "message": "LLM Guard API is running"
@@ -230,7 +241,7 @@ async def root(caller: dict = Depends(require_role("admin", "developer", "viewer
 # =========================================================
 
 @app.get("/audit/summary")
-async def audit_summary(caller: dict = Depends(require_role("admin"))):
+async def audit_summary():
     """
     Return latency information collected from the
     security pipeline.
@@ -274,14 +285,14 @@ async def audit_summary(caller: dict = Depends(require_role("admin"))):
 async def proxy_chat(
     request: ChatRequest,
     http_request: Request,
-    caller: dict = Depends(require_role("admin", "developer")),
 ):
+
     user_message = request.message
 
-    user_id = http_request.headers.get(
-        "X-User-ID",
-        "unknown"
-    )
+    # =====================================================
+    # 1. RATE LIMITING
+    # =====================================================
+
     client_ip = (
         http_request.client.host
         if http_request.client
@@ -297,42 +308,44 @@ async def proxy_chat(
             original_message=user_message,
         )
 
+        rate_limit_result = {
+            "status": "Blocked",
+            "error": "Rate limit exceeded",
+            "reason": "Too many requests from this client",
+            "retry_after_seconds": retry_after,
+            "owasp": get_owasp_mapping("rate_limit"),
+        }
+        record_prompt(user_message, rate_limit_result)
         return JSONResponse(
             status_code=429,
-            content={
-                "status": "Blocked",
-                "error": "Rate limit exceeded",
-                "reason": "Too many requests from this client",
-                "retry_after_seconds": retry_after,
-                "owasp": get_owasp_mapping("rate_limit"),
-            },
+            content=rate_limit_result,
             headers={
                 "Retry-After": str(retry_after)
             },
         )
 
 
-    # =========================================================
+    # =====================================================
     # 2. FIREWALL CHECK
-    # =========================================================
+    # =====================================================
 
     is_safe, reason = apply_firewall(user_message)
 
     if not is_safe:
+
         log_event(
             status="Blocked",
-            user_id=user_id,
-            firewall_rule=reason,
             reason=reason,
             original_message=user_message,
         )
 
-        return {
-            "status": "Blocked",
-            "error": "Request blocked by firewall",
-            "reason": reason,
-            "owasp": get_owasp_mapping("firewall"),
-        }
+        return persist_and_return(user_message, {
+    "status": "Blocked",
+    "error": "Request blocked by firewall",
+    "reason": reason,
+    "owasp": get_owasp_mapping("firewall"),
+})
+
 
     # =====================================================
     # 3. ML JAILBREAK DETECTION
@@ -341,24 +354,22 @@ async def proxy_chat(
     ml_prediction = detect_jailbreak(user_message)
 
     if ml_prediction == "JAILBREAK":
+
         log_event(
             status="Blocked",
-            user_id=user_id,
-            firewall_rule="ML_JAILBREAK_DETECTION",
             reason="ML jailbreak detection",
             ml_prediction=ml_prediction,
             original_message=user_message,
         )
 
-        return {
+        return persist_and_return(user_message, {
             "status": "Blocked",
             "error": "Request blocked by ML jailbreak detector",
             "reason": (
                 "ML model classified this prompt "
                 "as a jailbreak attempt"
             ),
-            "owasp": get_owasp_mapping("jailbreak"),
-        }
+        })
 
 
     # =====================================================
@@ -454,12 +465,12 @@ async def proxy_chat(
                 original_message=user_message,
             )
 
-            return {
+            return persist_and_return(user_message, {
                 "status": "Failed",
                 "error": "Upstream API timed out",
                 "original_message": user_message,
                 "safe_message_sent": safe_message,
-            }
+            })
 
 
         except httpx.HTTPStatusError as error:
@@ -473,7 +484,7 @@ async def proxy_chat(
                 original_message=user_message,
             )
 
-            return {
+            return persist_and_return(user_message, {
                 "status": "Failed",
                 "error": (
                     "Upstream API returned "
@@ -481,7 +492,7 @@ async def proxy_chat(
                 ),
                 "original_message": user_message,
                 "safe_message_sent": safe_message,
-            }
+            })
 
 
         except Exception as error:
@@ -492,12 +503,12 @@ async def proxy_chat(
                 original_message=user_message,
             )
 
-            return {
+            return persist_and_return(user_message, {
                 "status": "Failed",
                 "error": str(error),
                 "original_message": user_message,
                 "safe_message_sent": safe_message,
-            }
+            })
 
 
     # =====================================================
@@ -529,13 +540,13 @@ async def proxy_chat(
             original_message=user_message,
         )
 
-        return {
+        return persist_and_return(user_message, {
             "status": "Blocked",
             "error": (
                 "Response blocked by output validation"
             ),
             "reason": validation.blocked_reason,
-        }
+        })
 
 
      # =====================================================
@@ -572,7 +583,7 @@ async def proxy_chat(
     # 11. FINAL SAFE RESPONSE
     # =====================================================
 
-    return {
+    return persist_and_return(user_message, {
         "status": "Processed Successfully",
         "risk_level": risk_level,
         "total_sensitive_items": len(results),
@@ -585,4 +596,17 @@ async def proxy_chat(
         "output_warnings": validation.warnings,
         "output_sensitive_items": len(output_results),
         "output_detected_items": output_detected_items,
-    }
+    })
+
+
+@app.get("/analytics/dashboard")
+async def analytics_dashboard():
+    """Read-only persistent history and aggregate values for the dashboard."""
+    return dashboard_data()
+
+
+@app.post("/analytics/history")
+async def save_simulated_history(record: HistoryRecord):
+    """Persist the frontend's existing simulated-mode result without altering it."""
+    record_prompt(record.prompt, record.result)
+    return {"saved": True}

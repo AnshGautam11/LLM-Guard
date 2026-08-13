@@ -14,23 +14,23 @@ import {
    console rather than a generic chat UI.
    ============================================================ */
 const T = {
-  bg: "#100a0b",
-  bgAlt: "#160e10",
-  panel: "#1c1214",
-  panel2: "#241519",
-  raised: "#2a171b",
-  border: "#3a2126",
-  borderStrong: "#5c2a30",
-  crimson: "#d4223f",
-  crimsonDim: "#8c1c2c",
-  crimsonSoft: "#3a1216",
-  ember: "#e8613f",
-  text: "#f3e8e6",
-  textMuted: "#b18e8b",
-  textFaint: "#7c5f5d",
-  safe: "#3fae7c",
-  safeSoft: "#12271f",
-  warn: "#d99a3a",
+  bg: "var(--bg)",
+  bgAlt: "var(--surface)",
+  panel: "var(--surface)",
+  panel2: "var(--surface-2)",
+  raised: "var(--surface-3)",
+  border: "var(--border)",
+  borderStrong: "var(--border-light)",
+  crimson: "var(--primary)",
+  crimsonDim: "var(--primary-strong)",
+  crimsonSoft: "var(--primary-soft)",
+  ember: "var(--info)",
+  text: "var(--text)",
+  textMuted: "var(--text-secondary)",
+  textFaint: "var(--muted)",
+  safe: "var(--success)",
+  safeSoft: "rgba(94, 226, 112, 0.10)",
+  warn: "var(--warning)",
 };
 
 const FONT_IMPORT =
@@ -136,11 +136,12 @@ function mockPipeline(message, model) {
 function Badge({ tone = "neutral", children, icon: Icon }) {
   const tones = {
     neutral: { bg: T.panel2, fg: T.textMuted, bd: T.border },
-    crimson: { bg: T.crimsonSoft, fg: "#ff8a92", bd: T.crimsonDim },
-    safe: { bg: T.safeSoft, fg: T.safe, bd: "#1e4a37" },
-    warn: { bg: "#2c2010", fg: T.warn, bd: "#4a3818" },
+    crimson: { bg: "rgba(255, 82, 82, 0.10)", fg: "var(--danger)", bd: "rgba(255, 82, 82, 0.35)" },
+    safe: { bg: T.safeSoft, fg: T.safe, bd: "rgba(94, 226, 112, 0.32)" },
+    warn: { bg: "rgba(255, 184, 77, 0.10)", fg: T.warn, bd: "rgba(255, 184, 77, 0.35)" },
   };
   const c = tones[tone];
+
   return (
     <span
       style={{
@@ -168,7 +169,7 @@ function Badge({ tone = "neutral", children, icon: Icon }) {
 function Card({ children, style, className }) {
   return (
     <div
-      className={className}
+      className={`guard-card ${className || ""}`}
       style={{
         background: T.panel,
         border: `1px solid ${T.border}`,
@@ -267,7 +268,7 @@ function ResponseBody({ text }) {
         <div
           key={`c-${idx}`}
           style={{
-            background: "#0b0607",
+            background: T.bg,
             border: `1px solid ${T.border}`,
             borderRadius: 8,
             padding: "12px 14px",
@@ -294,7 +295,7 @@ function ResponseBody({ text }) {
               margin: 0,
               fontFamily: "'IBM Plex Mono', monospace",
               fontSize: 13,
-              color: "#ffb9a8",
+              color: "var(--primary)",
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
             }}
@@ -325,9 +326,21 @@ function Dashboard() {
     latencies: [],
     perModel: {},
   });
+  const [dashboardData, setDashboardData] = useState(null);
   const taRef = useRef(null);
 
   const activeModel = MODELS.find((m) => m.id === model);
+
+  const loadDashboard = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/analytics/dashboard`);
+      if (response.ok) setDashboardData(await response.json());
+    } catch {
+      // The existing simulated console remains available when the API is offline.
+    }
+  }, [apiBase]);
+
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   const runPipeline = useCallback(async () => {
     if (!prompt.trim() || loading) return;
@@ -375,8 +388,20 @@ function Dashboard() {
         [activeModel.label]: (s.perModel[activeModel.label] || 0) + 1,
       },
     }));
+    if (!liveMode) {
+      try {
+        await fetch(`${apiBase.replace(/\/$/, "")}/analytics/history`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, result: data }),
+        });
+      } catch {
+        // Persistence resumes automatically once the API is reachable.
+      }
+    }
+    await loadDashboard();
     setLoading(false);
-  }, [prompt, loading, liveMode, apiBase, activeModel]);
+  }, [prompt, loading, liveMode, apiBase, activeModel, loadDashboard]);
 
   const avgLatency = stats.latencies.length
     ? Math.round(
@@ -388,16 +413,19 @@ function Dashboard() {
     Object.entries(stats.perModel).sort((a, b) => b[1] - a[1])[0]?.[0] ??
     "—";
 
+  const persistedStats = dashboardData?.statistics;
+
   return (
     <div>
       {/* HERO */}
-      <section
+      <section className="guard-dashboard-hero"
         style={{
-          padding: "56px 0 40px",
+          padding: "72px 0 52px",
           borderBottom: `1px solid ${T.border}`,
+          textAlign: "center",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 18 }}>
           <div
             style={{
               width: 34,
@@ -421,7 +449,7 @@ function Dashboard() {
               color: T.textMuted,
             }}
           >
-            LLM-Guard Console
+            LLM Guard
           </span>
         </div>
         <h1
@@ -432,23 +460,36 @@ function Dashboard() {
             lineHeight: 1.15,
             color: T.text,
             margin: "0 0 14px",
-            maxWidth: 760,
+            maxWidth: 760, marginInline: "auto",
           }}
         >
-          Every prompt passes through the pipeline before it reaches a model.
+          Generative AI Security &amp; Prompt Protection Platform
         </h1>
-        <p style={{ color: T.textMuted, fontSize: 15.5, maxWidth: 620, lineHeight: 1.7, margin: "0 0 22px" }}>
+        <p style={{ color: T.textMuted, fontSize: 15.5, maxWidth: 660, lineHeight: 1.7, margin: "0 auto 22px" }}>
           Rate limiting, pattern firewall, an ML jailbreak classifier, PII redaction,
           the model call, then output validation on the way back. This console runs
           that sequence against the model you choose and shows you the verdict.
         </p>
-        <ScanTicker />
+        <div style={{ display: "inline-flex", padding: "10px 14px", borderRadius: 999, background: T.crimsonSoft, border: `1px solid ${T.borderStrong}` }}><ScanTicker /></div>
+      </section>
+
+      <section style={{ padding: "42px 0 6px" }}>
+        <SectionHeading eyebrow="Live database metrics" title="Security overview" description="Counts are calculated from the persistent audit history." />
+        <div className="guard-overview-grid">
+          <StatCard icon={Hash} label="Prompts checked" value={persistedStats?.total_prompts ?? stats.totalPrompts} />
+          <StatCard icon={ShieldCheck} label="Prompts allowed" value={persistedStats?.allowed ?? 0} />
+          <StatCard icon={ShieldX} label="Prompts blocked" value={persistedStats?.blocked ?? 0} />
+          <StatCard icon={ShieldAlert} label="Threats detected" value={persistedStats?.threats_detected ?? 0} />
+          <StatCard icon={Activity} label="Detection rate" value={`${persistedStats?.success_rate ?? 0}%`} />
+          <StatCard icon={Radio} label="System status" value="Operational" small />
+        </div>
       </section>
 
       {/* CONSOLE */}
       <section className="guard-grid-2" style={{ padding: "40px 0", display: "grid", gridTemplateColumns: "minmax(0,1.7fr) minmax(0,1fr)", gap: 22 }}>
         {/* left: runner */}
         <div>
+          <SectionHeading eyebrow="Existing secure pipeline" title="Prompt analyzer" description="Submit a prompt to run the configured guardrails without changing the existing flow." compact />
           <Card style={{ padding: 20 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
               <div style={{ flex: "1 1 220px" }}>
@@ -480,7 +521,7 @@ function Dashboard() {
                     style={{
                       ...ghostBtnStyle,
                       borderColor: liveMode ? T.crimsonDim : T.border,
-                      color: liveMode ? "#ff8a92" : T.textMuted,
+                      color: liveMode ? T.crimson : T.textMuted,
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -526,7 +567,7 @@ function Dashboard() {
                   borderRadius: 8,
                   border: "none",
                   background: !prompt.trim() || loading ? T.crimsonDim : T.crimson,
-                  color: "#fff",
+                  color: "#041008",
                   fontWeight: 600,
                   fontSize: 14,
                   cursor: !prompt.trim() || loading ? "default" : "pointer",
@@ -584,7 +625,7 @@ function Dashboard() {
 
             {result && result.status === "Blocked" && (
               <div>
-                <p style={{ color: "#ff8a92", fontSize: 14.5, margin: "0 0 8px" }}>{result.reason || result.error}</p>
+                <p style={{ color: "var(--danger)", fontSize: 14.5, margin: "0 0 8px" }}>{result.reason || result.error}</p>
                 <p style={{ color: T.textFaint, fontSize: 12.5 }}>Blocked before reaching the model — nothing was sent upstream.</p>
               </div>
             )}
@@ -648,6 +689,29 @@ function Dashboard() {
         </div>
       </section>
 
+      <section style={{ padding: "34px 0" }}>
+        <SectionHeading eyebrow="Stored security signals" title="Security analytics" description="Visualizations are generated only from records saved in the local database." />
+        <div className="guard-analytics-grid">
+          <ActivityChart data={dashboardData?.activity || []} />
+          <SecurityBreakdown stats={persistedStats} categories={dashboardData?.threat_categories || []} />
+        </div>
+      </section>
+
+      <PromptHistory records={dashboardData?.history || []} />
+
+      <section style={{ padding: "34px 0 64px" }}>
+        <SectionHeading eyebrow="Runtime health" title="System status" description="The configured protection layers are available to the existing request pipeline." />
+        <Card style={{ padding: 18 }}>
+          <div className="guard-system-grid">
+            {[["Firewall", "Active"], ["ML detector", "Active"], ["DLP redaction", "Active"], ["Audit database", dashboardData ? "Connected" : "Awaiting API"]].map(([name, state]) => (
+              <div key={name} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: `1px solid ${T.border}` }}>
+                <span style={{ color: T.text }}>{name}</span><Badge tone={state === "Awaiting API" ? "warn" : "safe"}>{state}</Badge>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </section>
+
       {/* GUIDE */}
       <section style={{ padding: "40px 0 64px", borderTop: `1px solid ${T.border}` }}>
         <span style={{ ...labelStyle, marginBottom: 6, display: "block" }}>How it works</span>
@@ -694,6 +758,65 @@ function StatCard({ icon: Icon, label, value, small }) {
       </div>
     </Card>
   );
+}
+
+function SectionHeading({ eyebrow, title, description, compact = false }) {
+  return (
+    <div style={{ marginBottom: compact ? 14 : 22 }}>
+      <span style={labelStyle}>{eyebrow}</span>
+      <h2 style={{ color: T.text, fontSize: compact ? 21 : 25, margin: "0 0 7px", fontWeight: 650 }}>{title}</h2>
+      <p style={{ color: T.textMuted, fontSize: 14, margin: 0 }}>{description}</p>
+    </div>
+  );
+}
+
+function ActivityChart({ data }) {
+  const width = 480, height = 180, max = Math.max(1, ...data.map((item) => item.count));
+  const points = data.map((item, index) => `${28 + index * ((width - 50) / Math.max(1, data.length - 1))},${height - 28 - (item.count / max) * (height - 54)}`).join(" ");
+  return <Card style={{ padding: 20, minHeight: 255 }}>
+    <span style={{ ...labelStyle, marginBottom: 5 }}>Prompt activity</span>
+    <p style={{ color: T.textMuted, fontSize: 13, margin: "0 0 12px" }}>Prompts checked by stored date</p>
+    {data.length ? <svg viewBox={`0 0 ${width} ${height}`} width="100%" role="img" aria-label="Prompt activity chart">
+      {[0, 1, 2, 3].map((line) => <line key={line} x1="28" x2={width - 16} y1={25 + line * 38} y2={25 + line * 38} stroke="var(--border)" strokeWidth="1" />)}
+      <polyline points={points} fill="none" stroke="var(--primary)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      {data.map((item, index) => { const x = 28 + index * ((width - 50) / Math.max(1, data.length - 1)); const y = height - 28 - (item.count / max) * (height - 54); return <g key={item.date}><circle cx={x} cy={y} r="4" fill="var(--primary)" /><text x={x} y={height - 7} fill="var(--muted)" fontSize="10" textAnchor="middle">{item.date.slice(5)}</text></g>; })}
+    </svg> : <EmptyChart text="Activity appears after the first stored prompt." />}
+  </Card>;
+}
+
+function SecurityBreakdown({ stats, categories }) {
+  const total = (stats?.allowed || 0) + (stats?.blocked || 0);
+  const allowedPercent = total ? Math.round((stats.allowed / total) * 100) : 0;
+  return <Card style={{ padding: 20, minHeight: 255 }}>
+    <span style={{ ...labelStyle, marginBottom: 5 }}>Security results</span>
+    <p style={{ color: T.textMuted, fontSize: 13, margin: "0 0 14px" }}>Allowed versus blocked stored prompts</p>
+    {total ? <>
+      <div style={{ height: 11, background: T.panel2, borderRadius: 999, overflow: "hidden", display: "flex", marginBottom: 16 }}><span style={{ width: `${allowedPercent}%`, background: T.safe }} /><span style={{ flex: 1, background: "var(--danger)" }} /></div>
+      <div style={{ display: "flex", gap: 20, marginBottom: 16 }}><span style={{ color: T.safe, fontSize: 13 }}>Allowed {stats.allowed}</span><span style={{ color: "var(--danger)", fontSize: 13 }}>Blocked {stats.blocked}</span></div>
+      {categories.length > 0 && <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10 }}>{categories.slice(0, 3).map((item) => <div key={item.category} style={{ display: "flex", justifyContent: "space-between", color: T.textMuted, fontSize: 13, padding: "4px 0" }}><span>{item.category}</span><span style={{ color: T.text }}>{item.count}</span></div>)}</div>}
+    </> : <EmptyChart text="Security breakdown appears after the first stored prompt." />}
+  </Card>;
+}
+
+function EmptyChart({ text }) { return <div style={{ minHeight: 120, display: "grid", placeItems: "center", color: T.textFaint, fontSize: 13, textAlign: "center", border: `1px dashed ${T.border}` }}>{text}</div>; }
+
+function safePreview(prompt) {
+  return String(prompt || "").replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email redacted]").replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[SSN redacted]").slice(0, 96) || "—";
+}
+
+function PromptHistory({ records }) {
+  const [query, setQuery] = useState(""); const [status, setStatus] = useState("all"); const [page, setPage] = useState(0);
+  const filtered = records.filter((row) => (status === "all" || row.status === status) && safePreview(row.prompt).toLowerCase().includes(query.toLowerCase()));
+  const visible = filtered.slice(page * 8, page * 8 + 8); const pageCount = Math.max(1, Math.ceil(filtered.length / 8));
+  useEffect(() => setPage(0), [query, status, records.length]);
+  return <section style={{ padding: "34px 0" }}>
+    <SectionHeading eyebrow="Persistent audit trail" title="Prompt history" description="Searchable records retained across frontend and backend restarts." />
+    <Card style={{ padding: 20, overflow: "hidden" }}>
+      <div className="guard-history-controls"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stored prompt previews" style={{ ...inputStyle, flex: 1 }} /><select value={status} onChange={(event) => setStatus(event.target.value)} style={selectStyle}><option value="all">All statuses</option><option value="Processed Successfully">Allowed</option><option value="Blocked">Blocked</option><option value="Failed">Failed</option></select></div>
+      <div className="guard-table-wrap"><table className="guard-history-table"><thead><tr><th>Time</th><th>Prompt preview</th><th>Status</th><th>Risk</th><th>Detection</th></tr></thead><tbody>{visible.length ? visible.map((row) => <tr key={row.id}><td>{new Date(row.created_at).toLocaleString()}</td><td title={safePreview(row.prompt)}>{safePreview(row.prompt)}</td><td><Badge tone={row.status === "Blocked" ? "crimson" : row.status === "Processed Successfully" ? "safe" : "warn"}>{row.status === "Processed Successfully" ? "Allowed" : row.status}</Badge></td><td>{row.risk_level || "—"}</td><td>{row.detection_result || "—"}</td></tr>) : <tr><td colSpan="5" className="guard-empty-row">No stored prompts match this view.</td></tr>}</tbody></table></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14, color: T.textFaint, fontSize: 12 }}><span>{filtered.length} stored record{filtered.length === 1 ? "" : "s"}</span><div style={{ display: "flex", gap: 8 }}><button disabled={page === 0} onClick={() => setPage((value) => value - 1)} style={ghostBtnStyle}>Previous</button><button disabled={page >= pageCount - 1} onClick={() => setPage((value) => value + 1)} style={ghostBtnStyle}>Next</button></div></div>
+    </Card>
+  </section>;
 }
 
 const labelStyle = {
@@ -933,7 +1056,7 @@ function Code({ children }) {
         padding: "1px 6px",
         fontFamily: "'IBM Plex Mono', monospace",
         fontSize: 13,
-        color: "#ffb9a8",
+        color: "var(--primary)",
       }}
     >
       {children}
@@ -977,14 +1100,14 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: "'IBM Plex Sans', sans-serif" }}>
+    <div style={{ background: T.bg, minHeight: "100vh", fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <style>{`
         ${FONT_IMPORT}
         @keyframes guardPulse { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(2.6); opacity: 0; } }
         @keyframes guardSpin { to { transform: rotate(360deg); } }
         @keyframes guardSweep { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         select option { background: ${T.panel2}; color: ${T.text}; }
-        ::selection { background: ${T.crimsonDim}; color: #fff; }
+        ::selection { background: var(--primary-strong); color: #041008; }
         @media (max-width: 860px) {
           .guard-grid-2 { grid-template-columns: 1fr !important; }
           .guard-docs-grid { grid-template-columns: 1fr !important; }
@@ -993,12 +1116,12 @@ export default function App() {
       `}</style>
 
       <div style={{ background: T.crimsonSoft, borderBottom: `1px solid ${T.crimsonDim}` }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "6px 24px", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: "#ff9a9f" }}>
+        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "6px 24px", fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: T.crimson }}>
           simulated mode by default — toggle "Live" in the console to point at your own /chat backend
         </div>
       </div>
 
-      <header style={{ borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, background: "rgba(16,10,11,0.92)", backdropFilter: "blur(6px)", zIndex: 10 }}>
+      <header style={{ borderBottom: `1px solid ${T.border}`, position: "sticky", top: 0, background: "rgba(6, 9, 8, 0.92)", backdropFilter: "blur(12px)", zIndex: 10 }}>
         <div style={{ maxWidth: 1120, margin: "0 auto", padding: "14px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={() => setPage("dashboard")}>
             <Shield size={18} color={T.crimson} />
