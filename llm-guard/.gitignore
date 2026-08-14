@@ -6,3 +6,11 @@ frontend/.env
 frontend/.env.local
 telemetry.db
 telemetry.log
+
+*.sqlite3
+llm_guard_history.sqlite3
+soc_users.json
+node_modules/
+soc-panel/node_modules/
+soc-panel/dist/
+*.pyc

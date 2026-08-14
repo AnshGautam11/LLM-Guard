@@ -19,6 +19,9 @@ def log_security_event(
     reason=None,
     risk_level=None,
     ml_prediction=None,
+    ml_score=None,
+    detected_items=None,
+    output_detected_items=None,
 ):
     """Store a security telemetry event in the prompt history database."""
     result = {
@@ -26,6 +29,9 @@ def log_security_event(
         "risk_level": risk_level,
         "ml_prediction": ml_prediction,
         "reason": reason,
+        "ml_score": ml_score,
+        "detected_items": detected_items or [],
+        "output_detected_items": output_detected_items or [],
     }
 
     record_prompt(prompt or "", result)
@@ -65,7 +71,7 @@ def record_prompt(prompt: str, result: dict):
     )
     details = {
         key: result[key]
-        for key in ("detected_items", "output_detected_items", "owasp_findings", "total_sensitive_items")
+        for key in ("detected_items", "output_detected_items", "owasp_findings", "total_sensitive_items", "ml_score")
         if key in result
     }
     with _connection() as connection:

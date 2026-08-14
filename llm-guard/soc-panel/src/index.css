@@ -1,0 +1,32 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: ui-monospace, 'SF Mono', 'IBM Plex Mono', Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+input:focus, select:focus, button:focus, textarea:focus {
+  outline: none;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.35);
+}
+
+@media (max-width: 860px) {
+  .soc-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+}

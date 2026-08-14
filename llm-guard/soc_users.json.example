@@ -1,0 +1,7 @@
+{
+  "admin": {
+    "password_hash": "8bff1ecdfc5aacce8de9db98a5b04c3195f08e2c7c4527f6c39f0781832e687c",
+    "salt": "2d6c35c1782fbbdbb26d3d7dbd06bb5d",
+    "role": "admin"
+  }
+}

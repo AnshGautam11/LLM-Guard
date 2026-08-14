@@ -43,6 +43,18 @@ class RateLimiter:
             request_times.append(current_time)
             return True, 0
 
+    def update_limits(self, max_requests=None, window_seconds=None) -> None:
+        """Update limits at runtime without replacing the limiter instance."""
+        with self.lock:
+            if max_requests is not None:
+                self.max_requests = max(1, int(max_requests))
+            if window_seconds is not None:
+                self.window_seconds = max(1, int(window_seconds))
+
+    def get_limits(self) -> dict:
+        with self.lock:
+            return {"max_requests": self.max_requests, "window_seconds": self.window_seconds}
+
     def reset_client(self, client_id: str) -> None:
         with self.lock:
             self.requests.pop(client_id, None)

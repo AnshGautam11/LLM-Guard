@@ -8,7 +8,7 @@ from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
 from presidio_anonymizer import AnonymizerEngine
 
 from firewall import apply_firewall
-from ml_detector import detect_jailbreak
+from ml_detector import detect_jailbreak, detect_jailbreak_detailed
 from telemetry import log_event
 from config import get_active_llm_config
 from rate_limiter import rate_limiter
@@ -16,6 +16,8 @@ from latency_audit import latency_audit
 from output_validator import validate_output
 from mock_llm import generate_mock_response
 from database import dashboard_data, record_prompt
+from guardrail_settings import get_settings
+from soc_routes import router as soc_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,6 +36,8 @@ app = FastAPI(
 # =========================================================
 # MIDDLEWARE (APP BANE KE BAAD ADD KAREIN)
 # =========================================================
+
+app.include_router(soc_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,18 +137,11 @@ def run_dlp_redaction(user_message: str):
     the user's input before it reaches the LLM.
     """
 
+    enabled = get_settings().get("dlp_entities_enabled", {})
     results = analyzer.analyze(
         text=user_message,
         language="en",
-        entities=[
-            "CREDIT_CARD",
-            "EMAIL_ADDRESS",
-            "PHONE_NUMBER",
-            "US_SSN",
-            "PERSON",
-            "LOCATION",
-            "API_KEY",
-        ],
+        entities=[name for name, on in enabled.items() if on],
     )
 
     anonymized = anonymizer.anonymize(
@@ -166,18 +163,11 @@ def run_output_dlp(response_text: str):
     sending the response back to the user.
     """
 
+    enabled = get_settings().get("dlp_entities_enabled", {})
     results = analyzer.analyze(
         text=response_text,
         language="en",
-        entities=[
-            "CREDIT_CARD",
-            "EMAIL_ADDRESS",
-            "PHONE_NUMBER",
-            "US_SSN",
-            "PERSON",
-            "LOCATION",
-            "API_KEY",
-        ],
+        entities=[name for name, on in enabled.items() if on],
     )
 
     anonymized = anonymizer.anonymize(
@@ -351,7 +341,9 @@ async def proxy_chat(
     # 3. ML JAILBREAK DETECTION
     # =====================================================
 
-    ml_prediction = detect_jailbreak(user_message)
+    ml_result = detect_jailbreak_detailed(user_message, get_settings().get("ml_threshold", 0.0))
+    ml_prediction = ml_result["prediction"]
+    ml_score = ml_result.get("score")
 
     if ml_prediction == "JAILBREAK":
 
@@ -359,6 +351,7 @@ async def proxy_chat(
             status="Blocked",
             reason="ML jailbreak detection",
             ml_prediction=ml_prediction,
+            ml_score=ml_score,
             original_message=user_message,
         )
 
@@ -385,12 +378,11 @@ async def proxy_chat(
     # 5. RISK LEVEL
     # =====================================================
 
+    thresholds = get_settings().get("risk_level_thresholds", {"medium": 1, "high": 3})
     risk_level = "LOW"
-
-    if len(results) >= 3:
+    if len(results) >= int(thresholds.get("high", 3)):
         risk_level = "HIGH"
-
-    elif len(results) >= 1:
+    elif len(results) >= int(thresholds.get("medium", 1)):
         risk_level = "MEDIUM"
 
 
@@ -537,6 +529,7 @@ async def proxy_chat(
                 f"{validation.blocked_reason}"
             ),
             ml_prediction=ml_prediction,
+            ml_score=ml_score,
             original_message=user_message,
         )
 
@@ -577,6 +570,7 @@ async def proxy_chat(
         detected_items=input_detected_items,
         output_detected_items=output_detected_items,
         ml_prediction=ml_prediction,
+        ml_score=ml_score,
     )
 
     # =====================================================
@@ -591,6 +585,7 @@ async def proxy_chat(
         "safe_message_sent": safe_message,
         "detected_items": input_detected_items,
         "ml_prediction": ml_prediction,
+        "ml_score": ml_score,
         "owasp_findings": owasp_findings,
         "upstream_response": safe_output,
         "output_warnings": validation.warnings,
