@@ -323,18 +323,12 @@ async def proxy_chat(
 
     if not is_safe:
 
-        log_event(
-            status="Blocked",
-            reason=reason,
-            original_message=user_message,
-        )
-
         return persist_and_return(user_message, {
-    "status": "Blocked",
-    "error": "Request blocked by firewall",
-    "reason": reason,
-    "owasp": get_owasp_mapping("firewall"),
-})
+            "status": "Blocked",
+            "error": "Request blocked by firewall",
+            "reason": reason,
+            "owasp": get_owasp_mapping("firewall"),
+        })
 
 
     # =====================================================
@@ -346,14 +340,6 @@ async def proxy_chat(
     ml_score = ml_result.get("score")
 
     if ml_prediction == "JAILBREAK":
-
-        log_event(
-            status="Blocked",
-            reason="ML jailbreak detection",
-            ml_prediction=ml_prediction,
-            ml_score=ml_score,
-            original_message=user_message,
-        )
 
         return persist_and_return(user_message, {
             "status": "Blocked",
