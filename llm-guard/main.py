@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import httpx
@@ -18,6 +18,7 @@ from mock_llm import generate_mock_response
 from database import dashboard_data, record_prompt
 from guardrail_settings import get_settings
 from soc_routes import router as soc_router
+from auth import require_role
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -275,6 +276,7 @@ async def audit_summary():
 async def proxy_chat(
     request: ChatRequest,
     http_request: Request,
+    caller: dict = Depends(require_role("admin", "developer")),
 ):
 
     user_message = request.message
